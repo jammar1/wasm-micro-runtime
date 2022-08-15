@@ -64,10 +64,10 @@ wasi_addr_to_sockaddr(const __wasi_addr_t *wasi_addr,
             struct sockaddr_in sock_addr_in = { 0 };
             uint32_t s_addr;
 
-            s_addr = (wasi_addr.addr.ip4.addr.n0 << 24)
-                     | (wasi_addr.addr.ip4.addr.n1 << 16)
-                     | (wasi_addr.addr.ip4.addr.n2 << 8)
-                     | wasi_addr.addr.ip4.addr.n3;
+            s_addr = (wasi_addr->addr.ip4.addr.n0 << 24)
+                     | (wasi_addr->addr.ip4.addr.n1 << 16)
+                     | (wasi_addr->addr.ip4.addr.n2 << 8)
+                     | wasi_addr->addr.ip4.addr.n3;
 
             sock_addr_in.sin_family = AF_INET;
             sock_addr_in.sin_addr.s_addr = htonl(s_addr);
@@ -283,4 +283,22 @@ getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     HANDLE_ERROR(error)
 
     return __WASI_ERRNO_SUCCESS;
+}
+
+int
+getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res)
+{
+    // Prepare input parameters
+    __wasi_addr_info_hints_t wasi_hints = { 0 };
+    __wasi_addr_info_t wasi_addr_info = { 0 };
+    __wasi_size_t wasi_addr_info_size = 0;
+    __wasi_size_t wasi_max_info_size = 0;
+
+
+
+    // Perform system call.
+    __wasi_errno_t error = __wasi_sock_addr_resolve(node, service, &wasi_hints, &wasi_addr_info, wasi_addr_info_size, &wasi_max_info_size);
+    HANDLE_ERROR(error);
+
+    return 0;
 }

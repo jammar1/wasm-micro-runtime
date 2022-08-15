@@ -7,7 +7,6 @@ ARG VARIANT=focal
 FROM ubuntu:${VARIANT}
 
 ARG DEBIAN_FRONTEND=noninteractive
-ENV TZ=Asian/Shanghai
 
 RUN apt update \
   && apt install -y apt-transport-https apt-utils build-essential \
@@ -36,7 +35,10 @@ RUN cd /opt/emsdk \
   && ./emsdk activate 2.0.26 \
   && echo "source /opt/emsdk/emsdk_env.sh" >> /root/.bashrc
 
-#
+
+# Install git
+RUN apt-get -y install git
+
 # install clang and llvm release
 ARG CLANG_VER=13.0.0
 RUN wget https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANG_VER}/clang+llvm-${CLANG_VER}-x86_64-linux-gnu-ubuntu-20.04.tar.xz -P /opt
@@ -62,15 +64,6 @@ RUN tar xf /opt/wabt-${WABT_VER}-ubuntu.tar.gz -C /opt \
   && ln -fs /opt/wabt-${WABT_VER} /opt/wabt
 RUN rm /opt/wabt-${WABT_VER}-ubuntu.tar.gz
 
-#
-# install bazelisk
-ARG BAZELISK_VER=1.10.1
-RUN mkdir /opt/bazelisk
-RUN wget -c https://github.com/bazelbuild/bazelisk/releases/download/v${BAZELISK_VER}/bazelisk-linux-amd64 -P /opt/bazelisk
-RUN chmod a+x /opt/bazelisk/bazelisk-linux-amd64 \
-  && ln -fs /opt/bazelisk/bazelisk-linux-amd64 /opt/bazelisk/bazel
-
-#
 # install
 RUN apt update && apt install -y clang-format
 
@@ -78,15 +71,9 @@ RUN apt update && apt install -y clang-format
 ENV PATH "$PATH:/opt/wasi-sdk/bin:/opt/wabt/bin:/opt/binaryen/bin:/opt/bazelisk:/opt/clang-llvm/bin"
 RUN echo "export PATH=/opt/wasi-sdk/bin:/opt/wabt/bin:/opt/binaryen/bin:/opt/bazelisk:/opt/clang-llvm/bin:${PATH}" >> /root/.bashrc
 
-#
-# PS
-RUN echo "PS1='\n[ \u@wamr-dev-docker \W ]\n$ '" >> /root/.bashrc
-
-# Clean up
-RUN apt-get autoremove -y \
-  && apt-get clean -y \
-  && rm -rf /var/lib/apt/lists/* \
-  && rm -rf /tmp/*
-
 VOLUME /workspace
 WORKDIR /workspace
+
+
+
+

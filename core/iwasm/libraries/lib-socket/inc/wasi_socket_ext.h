@@ -92,6 +92,7 @@ typedef struct __wasi_addr_info_hints_t {
  * Keep sync with
  * <sys/socket.h>
  * <sys/types.h>
+ * <netdb.h>
  */
 
 int
@@ -117,6 +118,9 @@ socket(int domain, int type, int protocol);
 
 int
 getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+
+//int
+//getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
 #endif
 
 /**
