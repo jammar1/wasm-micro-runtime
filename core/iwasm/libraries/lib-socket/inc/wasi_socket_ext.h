@@ -448,4 +448,7 @@ __wasi_sock_set_send_buf_size(__wasi_fd_t fd)
  * since don't want to re-compile the wasi-libc,
  * we tend to keep original implentations of recv() and send().
  */
+
+uint32
+get_lib_socket_export_apis(NativeSymbol **p_lib_socket_apis);
 #endif

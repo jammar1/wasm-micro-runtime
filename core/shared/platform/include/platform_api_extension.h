@@ -393,6 +393,102 @@ int
 os_socket_addr_local(bh_socket_t socket, uint8_t *buf, size_t buflen,
                      uint16_t *port, uint8_t *is_ipv4);
 
+/**
+ * Set the maximum send buffer size.
+ *
+ * @param socket the socket to set timeout
+ * @param bufsiz requested kernel buffer size
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_setsndbuf(bh_socket_t socket, uint64 bufsiz);
+
+/**
+ * Get the maximum send buffer size.
+ *
+ * @param socket the socket to set timeout
+ * @param bufsiz the returned kernel buffer size
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_getsndbuf(bh_socket_t socket, uint64 *bufsiz);
+
+/**
+ * Set the maximum receive buffer size.
+ *
+ * @param socket the socket to set timeout
+ * @param bufsiz requested kernel buffer size
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_setrcvbuf(bh_socket_t socket, uint64 bufsiz);
+
+/**
+ * Get the maximum receive buffer size.
+ *
+ * @param socket the socket to set timeout
+ * @param bufsiz the returned kernel buffer size
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_getrcvbuf(bh_socket_t socket, uint64 *bufsiz);
+
+/**
+ * Set enable or disable IP multicast loopback.
+ *
+ * @param socket the socket to set timeout
+ * @param enable 1 to enable or 0 to disable
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_setipmulticastloop(bh_socket_t socket, bool enable);
+
+/**
+ * Get nable or disable IP multicast loopback.
+ *
+ * @param socket the socket to set timeout
+ * @param enabled 1 for enabled or 0 for disabled
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_getipmulticastloop(bh_socket_t socket, bool *enabled);
+
+typedef struct {
+    uint32_t s_addr;
+} bh_in_addr;
+
+typedef struct {
+    bh_in_addr imr_multiaddr;
+    bh_in_addr imr_interface;
+} bh_ip_mreq;
+
+/**
+ * Add membership to a group
+ *
+ * @param socket the socket to set timeout
+ * @param mreq the group multicast address and local interface address
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_ipaddmembership(bh_socket_t socket, bh_ip_mreq *mreq);
+
+/**
+ * Drop membership of a group
+ *
+ * @param socket the socket to set timeout
+ * @param mreq the group multicast address and local interface address
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_dropipaddmembership(bh_socket_t socket, bh_ip_mreq *mreq);
 #ifdef __cplusplus
 }
 #endif

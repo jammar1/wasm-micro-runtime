@@ -64,10 +64,10 @@ wasi_addr_to_sockaddr(const __wasi_addr_t *wasi_addr,
             struct sockaddr_in sock_addr_in = { 0 };
             uint32_t s_addr;
 
-            s_addr = (wasi_addr.addr.ip4.addr.n0 << 24)
-                     | (wasi_addr.addr.ip4.addr.n1 << 16)
-                     | (wasi_addr.addr.ip4.addr.n2 << 8)
-                     | wasi_addr.addr.ip4.addr.n3;
+            s_addr = (wasi_addr->addr.ip4.addr.n0 << 24)
+                     | (wasi_addr->addr.ip4.addr.n1 << 16)
+                     | (wasi_addr->addr.ip4.addr.n2 << 8)
+                     | wasi_addr->addr.ip4.addr.n3;
 
             sock_addr_in.sin_family = AF_INET;
             sock_addr_in.sin_addr.s_addr = htonl(s_addr);
@@ -283,4 +283,16 @@ getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     HANDLE_ERROR(error)
 
     return __WASI_ERRNO_SUCCESS;
+}
+
+static NativeSymbol native_symbols_libc_wasi[] = {
+    REG_NATIVE_FUNC(args_get, "(**)i"),
+    
+};
+
+uint32
+get_lib_socket_export_apis(NativeSymbol **p_lib_socket_apis)
+{
+    *p_lib_socket_apis = native_symbols_sockets;
+    return sizeof(native_symbols_sockets) / sizeof(NativeSymbol);
 }

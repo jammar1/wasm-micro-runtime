@@ -50,6 +50,12 @@ uint32
 get_lib_pthread_export_apis(NativeSymbol **p_lib_pthread_apis);
 #endif
 
+#if WASM_ENABLE_SOCKET_EXT != 0
+
+uint32
+get_lib_socket_export_apis(NativeSymbol **p_lib_socket_apis);
+#endif
+
 uint32
 get_libc_emcc_export_apis(NativeSymbol **p_libc_emcc_apis);
 

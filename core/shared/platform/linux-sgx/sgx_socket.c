@@ -641,4 +641,68 @@ os_socket_addr_local(bh_socket_t socket, uint8_t *buf, size_t buflen,
     return BHT_ERROR;
 }
 
+
+int
+os_socket_setsndbuf(bh_socket_t socket, uint64 bufsiz)
+{
+    errno = ENOSYS;
+
+    return BHT_ERROR
+}
+
+int
+os_socket_getsndbuf(bh_socket_t socket, uint64 *bufsiz)
+{
+    errno = ENOSYS;
+
+    return BHT_ERROR
+}
+
+int
+os_socket_setrcvbuf(bh_socket_t socket, uint64 bufsiz)
+{
+    errno = ENOSYS;
+
+    return BHT_ERROR
+}
+
+int
+os_socket_getrcvbuf(bh_socket_t socket, uint64 *bufsiz)
+{
+    errno = ENOSYS;
+
+    return BHT_ERROR
+}
+
+int
+os_socket_setipmulticastloop(bh_socket_t socket, bool enable)
+{
+    errno = ENOSYS;
+
+    return BHT_ERROR
+}
+
+int
+os_socket_getipmulticastloop(bh_socket_t socket, bool *enabled)
+{
+    errno = ENOSYS;
+
+    return BHT_ERROR
+}
+
+int
+os_socket_ipaddmembership(bh_socket_t socket, bh_ip_mreq *mreq)
+{
+    errno = ENOSYS;
+
+    return BHT_ERROR
+}
+
+os_socket_dropipaddmembership(bh_socket_t socket, bh_ip_mreq *mreq)
+{
+    errno = ENOSYS;
+
+    return BHT_ERROR
+}
+
 #endif

@@ -321,3 +321,103 @@ os_socket_addr_local(bh_socket_t socket, uint8_t *buf, size_t buflen,
 
     return BHT_OK;
 }
+int
+os_socket_setsndbuf(bh_socket_t socket, uint64 bufsiz)
+{
+    if (setsockopt(socket, SOL_SOCKET, SO_SNDBUF, &bufsiz, sizeof(bufsiz))
+        != 0) {
+        return BHT_ERROR;
+    }
+
+    return BHT_OK;
+}
+
+int
+os_socket_getsndbuf(bh_socket_t socket, uint64 *bufsiz)
+{
+    assert(bufsiz);
+
+    socklen_t bufsiz_len = sizeof(bufsiz);
+    if (getsockopt(socket, SOL_SOCKET, SO_SNDBUF, bufsiz, &bufsiz_len) != 0) {
+        return BHT_ERROR;
+    }
+
+    return BHT_OK;
+}
+
+int
+os_socket_setrcvbuf(bh_socket_t socket, uint64 bufsiz)
+{
+    if (setsockopt(socket, SOL_SOCKET, SO_RCVBUF, &bufsiz, sizeof(bufsiz))
+        != 0) {
+        return BHT_ERROR;
+    }
+
+    return BHT_OK;
+}
+
+int
+os_socket_getrcvbuf(bh_socket_t socket, uint64 *bufsiz)
+{
+    assert(bufsiz);
+
+    socklen_t bufsiz_len = sizeof(bufsiz);
+    if (getsockopt(socket, SOL_SOCKET, SO_RCVBUF, bufsiz, &bufsiz_len) != 0) {
+        return BHT_ERROR;
+    }
+
+    return BHT_OK;
+}
+
+int
+os_socket_setipmulticastloop(bh_socket_t socket, bool enable)
+{
+    if (setsockopt(socket, IPPROTO_IP, IP_MULTICAST_LOOP, &enable,
+                   sizeof(enable))
+        != 0) {
+        return BHT_ERROR;
+    }
+
+    return BHT_OK;
+}
+
+int
+os_socket_getipmulticastloop(bh_socket_t socket, bool *enabled)
+{
+    assert(enabled);
+
+    int enabled_size = sizeof(enabled);
+    if (setsockopt(socket, IPPROTO_IP, IP_MULTICAST_LOOP, enabled,
+                   sizeof(enabled_size))
+        != 0) {
+        return BHT_ERROR;
+    }
+
+    return BHT_OK;
+}
+
+int
+os_socket_ipaddmembership(bh_socket_t socket, bh_ip_mreq *mreq)
+{
+    assert(mreq);
+
+    if (setsockopt(socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq,
+                   sizeof(bh_ip_mreq) != 0)) {
+        return BHT_ERROR;
+    }
+
+    return BHT_OK;
+}
+
+int
+os_socket_dropipaddmembership(bh_socket_t socket, bh_ip_mreq *mreq)
+{
+    assert(mreq);
+
+    if (setsockopt(socket, IPPROTO_IP, IP_DROP_MEMBERSHIP, mreq,
+                   sizeof(bh_ip_mreq) != 0)) {
+        return BHT_ERROR;
+    }
+
+    return BHT_OK;
+}
