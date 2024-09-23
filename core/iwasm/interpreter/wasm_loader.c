@@ -307,7 +307,7 @@ is_byte_a_type(uint8 type)
 }
 
 #if WASM_ENABLE_SIMD != 0
-#if (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0)
+//#if (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0)
 static V128
 read_i8x16(uint8 *p_buf, char *error_buf, uint32 error_buf_size)
 {
@@ -320,7 +320,7 @@ read_i8x16(uint8 *p_buf, char *error_buf, uint32 error_buf_size)
 
     return result;
 }
-#endif /* end of (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0) */
+//#endif /* end of (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0) */
 #endif /* end of WASM_ENABLE_SIMD */
 
 static void *
@@ -3737,10 +3737,12 @@ load_function_section(const uint8 *buf, const uint8 *buf_end,
                 /* 0x7F/0x7E/0x7D/0x7C */
                 type = read_uint8(p_code);
                 if (!is_valid_value_type_for_interpreter(type)) {
+#if WASM_ENABLE_SIMD != 1
                     if (type == VALUE_TYPE_V128)
                         set_error_buf(error_buf, error_buf_size,
                                       "v128 value type requires simd feature");
-                    else if (type == VALUE_TYPE_FUNCREF
+#endif
+                    if (type == VALUE_TYPE_FUNCREF
                              || type == VALUE_TYPE_EXTERNREF)
                         set_error_buf(error_buf, error_buf_size,
                                       "ref value type requires "
@@ -9988,7 +9990,7 @@ check_memory_access_align(uint8 opcode, uint32 align, char *error_buf,
 }
 
 #if WASM_ENABLE_SIMD != 0
-#if (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0)
+//#if (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0)
 static bool
 check_simd_memory_access_align(uint8 opcode, uint32 align, char *error_buf,
                                uint32 error_buf_size)
@@ -10102,7 +10104,7 @@ check_simd_shuffle_mask(V128 mask, char *error_buf, uint32 error_buf_size)
     }
     return true;
 }
-#endif /* end of (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0) */
+//#endif /* end of (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0) */
 #endif /* end of WASM_ENABLE_SIMD */
 
 #if WASM_ENABLE_SHARED_MEMORY != 0
@@ -14955,7 +14957,7 @@ re_scan:
             }
 
 #if WASM_ENABLE_SIMD != 0
-#if (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0)
+//#if (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0)
             case WASM_OP_SIMD_PREFIX:
             {
                 uint32 opcode1;
@@ -15609,7 +15611,7 @@ re_scan:
                 }
                 break;
             }
-#endif /* end of (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0) */
+//#endif /* end of (WASM_ENABLE_WAMR_COMPILER != 0) || (WASM_ENABLE_JIT != 0) */
 #endif /* end of WASM_ENABLE_SIMD */
 
 #if WASM_ENABLE_SHARED_MEMORY != 0

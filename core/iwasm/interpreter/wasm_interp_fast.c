@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
+// TODO gate this behind ARM
+#include <arm_neon.h>
 #include "wasm_interp.h"
 #include "bh_log.h"
 #include "wasm_runtime.h"
@@ -433,6 +435,10 @@ wasm_interp_get_frame_ref(WASMInterpFrame *frame)
     (type) GET_I64_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
 #define GET_OPERAND_F64(type, off) \
     (type) GET_F64_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
+
+#define GET_OPERAND_V128(type, off) \
+    (type) GET_V128_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
+
 #define GET_OPERAND_REF(type, off) \
     (type) GET_REF_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
 
@@ -4891,6 +4897,10 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                     }
                 }
 #endif
+                else if (local_type == VALUE_TYPE_V128) {
+                    PUT_V128_TO_ADDR((uint32 *)(frame_lp + local_offset),
+                                     GET_V128_FROM_ADDR(frame_lp + addr1));
+                }
                 else {
                     wasm_set_exception(module, "invalid local type");
                     goto got_exception;
@@ -5061,7 +5071,7 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
 #endif
 
 #ifndef OS_ENABLE_HW_BOUND_CHECK
-                        CHECK_BULK_MEMORY_OVERFLOW(dst, len, mdst);
+                        asdasdsa CHECK_BULK_MEMORY_OVERFLOW(dst, len, mdst);
 #else
                         if ((uint64)(uint32)dst + len > linear_mem_size)
                             goto out_of_bounds;
@@ -5676,7 +5686,62 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                 goto call_func_from_return_call;
             }
 #endif /* WASM_ENABLE_TAIL_CALL */
+#if WASM_ENABLE_SIMD != 0
+            HANDLE_OP(WASM_OP_SIMD_PREFIX)
+            {
+                GET_OPCODE();
+                switch (opcode) {
+                    case SIMD_v8x16_shuffle:
+                    {
+                        uint8x16_t a, b, result;
+                        uint8_t lane_idx[16];
 
+                        // Get the two input vectors
+                        b = vld1q_u8((uint8_t *)(frame_lp + GET_OFFSET()));
+                        frame_lp += 16;
+                        a = vld1q_u8((uint8_t *)(frame_lp + GET_OFFSET()));
+                        frame_lp += 16;
+
+                        // Get the 16 bytes of immediate mode operands (lane
+                        // indices)
+                        for (int i = 0; i < 16; i++) {
+                            lane_idx[i] = *frame_ip++;
+                        }
+
+                        // Perform the shuffle operation
+                        uint8x16_t indices = vld1q_u8(lane_idx);
+                        uint8x16_t mask = vcltq_u8(indices, vdupq_n_u8(16));
+
+                        uint8x16_t a_shuffled = vqtbl1q_u8(a, indices);
+                        uint8x16_t b_shuffled =
+                            vqtbl1q_u8(b, vsubq_u8(indices, vdupq_n_u8(16)));
+
+                        result = vbslq_u8(mask, a_shuffled, b_shuffled);
+
+                        // Store the result
+                        vst1q_u8((uint8_t *)(frame_lp + GET_OFFSET()), result);
+
+                        break;
+                    }
+                    case SIMD_v128_load8x8_s:
+                    {
+                        uint8x8_t result;
+                        // Load 8 bytes (64 bits) from memory
+                        result = vld1_u8((uint8_t *)(frame_lp + GET_OFFSET()));
+                        // Store the result
+                        vst1_u8((uint8_t *)(frame_lp + GET_OFFSET()), result);
+                        break;
+                    }
+                    case SIMD_i8x16_all_true:
+                        abort();
+                        break;
+
+                    default:
+                        abort();
+                }
+                HANDLE_OP_END();
+            }
+#endif
 #if WASM_ENABLE_LABELS_AS_VALUES == 0
             default:
                 wasm_set_exception(module, "unsupported opcode");

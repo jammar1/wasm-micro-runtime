@@ -13,6 +13,9 @@ extern "C" {
 #include "platform_internal.h"
 #include "../../../config.h"
 
+// TODO ARM ONLY
+#include "arm_neon.h"
+
 #define BH_MAX_THREAD 32
 
 #define BHT_ERROR (-1)
@@ -109,6 +112,7 @@ typedef float float32;
 typedef double float64;
 typedef uint64_t uint64;
 typedef int64_t int64;
+typedef int8x16_t int128;
 
 typedef void *(*thread_start_routine_t)(void *);
 

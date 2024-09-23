@@ -41,6 +41,10 @@ extern "C" {
     do {                                       \
         *(float64 *)(addr) = (float64)(value); \
     } while (0)
+#define PUT_V128_TO_ADDR(addr, value)          \
+    do {                                       \
+        *(int128 *)(addr) = (int128)(value);       \
+    } while (0)
 #define PUT_REF_TO_ADDR(addr, value)        \
     do {                                    \
         *(void **)(addr) = (void *)(value); \
@@ -48,6 +52,7 @@ extern "C" {
 
 #define GET_I64_FROM_ADDR(addr) (*(int64 *)(addr))
 #define GET_F64_FROM_ADDR(addr) (*(float64 *)(addr))
+#define GET_V128_FROM_ADDR(addr) (*(int128 *)(addr))
 #define GET_REF_FROM_ADDR(addr) (*(void **)(addr))
 
 /* For STORE opcodes */
