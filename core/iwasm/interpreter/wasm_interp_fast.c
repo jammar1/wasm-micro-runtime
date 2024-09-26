@@ -5732,6 +5732,9 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                         vst1_u8((uint8_t *)(frame_lp + GET_OFFSET()), result);
                         break;
                     }
+                    case SIMD_v128_const:
+                        abort();
+                        break;
                     case SIMD_i8x16_all_true:
                         abort();
                         break;
