@@ -47,7 +47,7 @@ typedef float64 CellType_F64;
      && (app_addr) <= shared_heap_end_off - bytes + 1)
 
 #define shared_heap_addr_app_to_native(app_addr, native_addr) \
-    native_addr = shared_heap_base_addr + ((app_addr)-shared_heap_start_off)
+    native_addr = shared_heap_base_addr + ((app_addr) - shared_heap_start_off)
 
 #define CHECK_SHARED_HEAP_OVERFLOW(app_addr, bytes, native_addr) \
     if (app_addr_in_shared_heap(app_addr, bytes))                \
@@ -1788,7 +1788,7 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                 else
                     cur_func_type = cur_func->u.func->func_type;
 
-                    /* clang-format off */
+                /* clang-format off */
 #if WASM_ENABLE_GC == 0
                 if (cur_type != cur_func_type) {
                     wasm_set_exception(module, "indirect call type mismatch");
@@ -6431,14 +6431,74 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                         SIMD_LOAD_LANE_OP(i64x2, 64);
                         break;
                     }
+#define SIMD_STORE_LANE_OP(register, width)               \
+    do {                                                  \
+        uint32 offset, addr;                              \
+        offset = read_uint32(frame_ip);                   \
+        V128 vec = POP_V128();                            \
+        int32 base = POP_I32();                           \
+        offset += base;                                   \
+        int lane = *frame_ip++;                           \
+        addr = GET_OPERAND(uint32, I32, 0);               \
+        addr_ret = GET_OFFSET();                          \
+        CHECK_MEMORY_OVERFLOW(width / 8);                 \
+        if (width == 64) {                                \
+            STORE_I64(maddr, vec.register[lane]);         \
+        }                                                 \
+        else {                                            \
+            *(uint##width *)(maddr) = vec.register[lane]; \
+        }                                                 \
+    } while (0)
+
                     case SIMD_v128_store8_lane:
+                    {
+                        SIMD_STORE_LANE_OP(i8x16, 8);
+                        break;
+                    }
+
                     case SIMD_v128_store16_lane:
+                    {
+                        SIMD_STORE_LANE_OP(i16x8, 16);
+                        break;
+                    }
+
                     case SIMD_v128_store32_lane:
+                    {
+                        SIMD_STORE_LANE_OP(i32x4, 32);
+                        break;
+                    }
+
                     case SIMD_v128_store64_lane:
+                    {
+                        SIMD_STORE_LANE_OP(i64x2, 64);
+                        break;
+                    }
+#define SIMD_LOAD_ZERO_OP(register, width)                 \
+    do {                                                   \
+        uint32 offset, addr;                               \
+        offset = read_uint32(frame_ip);                    \
+        int32 base = POP_I32();                            \
+        offset += base;                                    \
+        addr = GET_OPERAND(uint32, I32, 0);                \
+        addr_ret = GET_OFFSET();                           \
+        CHECK_MEMORY_OVERFLOW(width / 8);                  \
+        V128 result = { 0 };                               \
+        if (width == 64) {                                 \
+            result.register[0] = GET_I64_FROM_ADDR(maddr); \
+        }                                                  \
+        else {                                             \
+            result.register[0] = *(uint##width *)(maddr);  \
+        }                                                  \
+        PUT_V128_TO_ADDR(frame_lp + addr_ret, result);     \
+    } while (0)
                     case SIMD_v128_load32_zero:
+                    {
+                        SIMD_LOAD_ZERO_OP(i32x4, 32);
+                        break;
+                    }
                     case SIMD_v128_load64_zero:
                     {
-                        wasm_set_exception(module, "unsupported SIMD opcode");
+                        SIMD_LOAD_ZERO_OP(i64x2, 64);
                         break;
                     }
 
