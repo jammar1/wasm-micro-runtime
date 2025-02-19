@@ -918,7 +918,7 @@ function do_execute_in_running_mode()
     fi
 
     if [[ ${ENABLE_SIMD} -eq 1 ]]; then
-        if [[ "${RUNNING_MODE}" != "jit" && "${RUNNING_MODE}" != "aot" ]]; then
+        if [[ "${RUNNING_MODE}" != "jit" && "${RUNNING_MODE}" != "aot" && "${RUNNING_MODE}" != "fast-interp" ]]; then
             echo "support simd in llvm-jit mode and aot mode"
             return 0;
         fi
