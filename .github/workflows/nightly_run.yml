@@ -162,6 +162,8 @@ jobs:
             make_options_feature: "-DWAMR_BUILD_SIMD=1"
           - make_options_run_mode: $FAST_INTERP_BUILD_OPTIONS
             make_options_feature: "-DWAMR_BUILD_SIMD=1"
+          - make_options_run_mode: "$FAST_INTERP_BUILD_OPTIONS"
+            make_options_feature: "-DWAMR_BUILD_LIB_SIMDE=1"
           # DEBUG_INTERP only on CLASSIC INTERP mode
           - make_options_run_mode: $AOT_BUILD_OPTIONS
             make_options_feature: "-DWAMR_BUILD_DEBUG_INTERP=1"
@@ -320,10 +322,8 @@ jobs:
           # MULTI_MODULE only on INTERP mode and AOT mode
           - make_options_run_mode: $FAST_JIT_BUILD_OPTIONS
             make_options_feature: "-DWAMR_BUILD_MULTI_MODULE=1"
-          # SIMD only on JIT/AOT mode
+          # SIMD only on JIT/AOT/Fast interpreter mode
           - make_options_run_mode: $CLASSIC_INTERP_BUILD_OPTIONS
-            make_options_feature: "-DWAMR_BUILD_SIMD=1"
-          - make_options_run_mode: $FAST_INTERP_BUILD_OPTIONS
             make_options_feature: "-DWAMR_BUILD_SIMD=1"
           # DEBUG_INTERP only on CLASSIC INTERP mode
           - make_options_run_mode: $FAST_INTERP_BUILD_OPTIONS
@@ -677,10 +677,8 @@ jobs:
             sanitizer: tsan
           - running_mode: "multi-tier-jit"
             sanitizer: tsan
-          # classic-interp and fast-interp don't support simd
+          # classic-interp doesn't support simd
           - running_mode: "classic-interp"
-            test_option: $SIMD_TEST_OPTIONS
-          - running_mode: "fast-interp"
             test_option: $SIMD_TEST_OPTIONS
           # llvm jit doesn't support multi module
           - running_mode: "jit"
