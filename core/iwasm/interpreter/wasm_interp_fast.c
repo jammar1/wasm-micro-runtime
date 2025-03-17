@@ -5622,7 +5622,7 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                 GET_OPCODE();
                 frame_ip =
                     wasm_simd_handle_op(module, frame_ip, frame_lp, maddr,
-                                        &addr_ret, opcode, linear_mem_size
+                                        (uint32*)&addr_ret, opcode, linear_mem_size
 #if !defined(OS_ENABLE_HW_BOUND_CHECK) \
     || WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS == 0
                                         ,

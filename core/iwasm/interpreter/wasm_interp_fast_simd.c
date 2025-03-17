@@ -9,9 +9,9 @@
 #define SIMD_V128_TO_SIMDE_V128(v)                                      \
     ({                                                                  \
         bh_assert(sizeof(V128) == sizeof(simde_v128_t));                \
-        simde_v128_t result;                                            \
-        bh_memcpy_s(&result, sizeof(simde_v128_t), &(v), sizeof(V128)); \
-        result;                                                         \
+        simde_v128_t simde_result_temp;                                 \
+        bh_memcpy_s(&simde_result_temp, sizeof(simde_v128_t), &(v), sizeof(V128)); \
+        simde_result_temp;                                              \
     })
 
 #define SIMDE_V128_TO_SIMD_V128(sv, v)                                \
@@ -670,7 +670,7 @@
         *p_addr_ret = GET_OFFSET();                           \
         CHECK_MEMORY_OVERFLOW(width / 8);                  \
         if (width == 64) {                                 \
-            vec.register[lane] = GET_I64_FROM_ADDR(maddr); \
+            vec.register[lane] = GET_I64_FROM_ADDR((uint32*)maddr); \
         }                                                  \
         else {                                             \
             vec.register[lane] = *(uint##width *)(maddr);  \
