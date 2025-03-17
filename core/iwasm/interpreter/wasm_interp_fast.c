@@ -9,6 +9,7 @@
 #include "wasm_opcode.h"
 #include "wasm_loader.h"
 #include "wasm_memory.h"
+#include "wasm_interp_fast_macros.h"
 #include "../common/wasm_exec_env.h"
 #if WASM_ENABLE_GC != 0
 #include "../common/gc/gc_object.h"
@@ -21,79 +22,14 @@
 #include "../common/wasm_shared_memory.h"
 #endif
 
+#if WASM_ENABLE_SIMDE != 0
+#include "wasm_interp_fast_simd.h"
+#endif
+
 typedef int32 CellType_I32;
 typedef int64 CellType_I64;
 typedef float32 CellType_F32;
 typedef float64 CellType_F64;
-
-#if WASM_ENABLE_THREAD_MGR == 0
-#define get_linear_mem_size() linear_mem_size
-#else
-/**
- * Load memory data size in each time boundary check in
- * multi-threading mode since it may be changed by other
- * threads in memory.grow
- */
-#define get_linear_mem_size() GET_LINEAR_MEMORY_SIZE(memory)
-#endif
-
-#if WASM_ENABLE_SHARED_HEAP != 0
-#define app_addr_in_shared_heap(app_addr, bytes)        \
-    (shared_heap && (app_addr) >= shared_heap_start_off \
-     && (app_addr) <= shared_heap_end_off - bytes + 1)
-
-#define shared_heap_addr_app_to_native(app_addr, native_addr) \
-    native_addr = shared_heap_base_addr + ((app_addr)-shared_heap_start_off)
-
-#define CHECK_SHARED_HEAP_OVERFLOW(app_addr, bytes, native_addr) \
-    if (app_addr_in_shared_heap(app_addr, bytes))                \
-        shared_heap_addr_app_to_native(app_addr, native_addr);   \
-    else
-#else
-#define CHECK_SHARED_HEAP_OVERFLOW(app_addr, bytes, native_addr)
-#endif
-
-#if !defined(OS_ENABLE_HW_BOUND_CHECK) \
-    || WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS == 0
-#define CHECK_MEMORY_OVERFLOW(bytes)                                           \
-    do {                                                                       \
-        uint64 offset1 = (uint64)offset + (uint64)addr;                        \
-        CHECK_SHARED_HEAP_OVERFLOW(offset1, bytes, maddr)                      \
-        if (disable_bounds_checks || offset1 + bytes <= get_linear_mem_size()) \
-            /* If offset1 is in valid range, maddr must also                   \
-                be in valid range, no need to check it again. */               \
-            maddr = memory->memory_data + offset1;                             \
-        else                                                                   \
-            goto out_of_bounds;                                                \
-    } while (0)
-
-#define CHECK_BULK_MEMORY_OVERFLOW(start, bytes, maddr)                        \
-    do {                                                                       \
-        uint64 offset1 = (uint32)(start);                                      \
-        CHECK_SHARED_HEAP_OVERFLOW(offset1, bytes, maddr)                      \
-        if (disable_bounds_checks || offset1 + bytes <= get_linear_mem_size()) \
-            /* App heap space is not valid space for                           \
-               bulk memory operation */                                        \
-            maddr = memory->memory_data + offset1;                             \
-        else                                                                   \
-            goto out_of_bounds;                                                \
-    } while (0)
-#else
-#define CHECK_MEMORY_OVERFLOW(bytes)                      \
-    do {                                                  \
-        uint64 offset1 = (uint64)offset + (uint64)addr;   \
-        CHECK_SHARED_HEAP_OVERFLOW(offset1, bytes, maddr) \
-        maddr = memory->memory_data + offset1;            \
-    } while (0)
-
-#define CHECK_BULK_MEMORY_OVERFLOW(start, bytes, maddr)   \
-    do {                                                  \
-        uint64 offset1 = (uint32)(start);                 \
-        CHECK_SHARED_HEAP_OVERFLOW(offset1, bytes, maddr) \
-        maddr = memory->memory_data + offset1;            \
-    } while (0)
-#endif /* !defined(OS_ENABLE_HW_BOUND_CHECK) \
-          || WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS == 0 */
 
 #define CHECK_ATOMIC_MEMORY_ACCESS(align)          \
     do {                                           \
@@ -279,55 +215,6 @@ local_copysign(double x, double y)
     return ux.f;
 }
 
-#if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
-#define LOAD_U32_WITH_2U16S(addr) (*(uint32 *)(addr))
-#define LOAD_PTR(addr) (*(void **)(addr))
-#else /* else of WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS */
-static inline uint32
-LOAD_U32_WITH_2U16S(void *addr)
-{
-    union {
-        uint32 val;
-        uint16 u16[2];
-    } u;
-
-    bh_assert(((uintptr_t)addr & 1) == 0);
-    u.u16[0] = ((uint16 *)addr)[0];
-    u.u16[1] = ((uint16 *)addr)[1];
-    return u.val;
-}
-#if UINTPTR_MAX == UINT32_MAX
-#define LOAD_PTR(addr) ((void *)LOAD_U32_WITH_2U16S(addr))
-#elif UINTPTR_MAX == UINT64_MAX
-static inline void *
-LOAD_PTR(void *addr)
-{
-    uintptr_t addr1 = (uintptr_t)addr;
-    union {
-        void *val;
-        uint32 u32[2];
-        uint16 u16[4];
-    } u;
-
-    bh_assert(((uintptr_t)addr & 1) == 0);
-    if ((addr1 & (uintptr_t)7) == 0)
-        return *(void **)addr;
-
-    if ((addr1 & (uintptr_t)3) == 0) {
-        u.u32[0] = ((uint32 *)addr)[0];
-        u.u32[1] = ((uint32 *)addr)[1];
-    }
-    else {
-        u.u16[0] = ((uint16 *)addr)[0];
-        u.u16[1] = ((uint16 *)addr)[1];
-        u.u16[2] = ((uint16 *)addr)[2];
-        u.u16[3] = ((uint16 *)addr)[3];
-    }
-    return u.val;
-}
-#endif /* end of UINTPTR_MAX */
-#endif /* end of WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS */
-
 #if WASM_ENABLE_GC != 0
 static void
 init_frame_refs(uint8 *frame_ref, uint32 cell_num, WASMFunctionInstance *func)
@@ -400,9 +287,6 @@ wasm_interp_get_frame_ref(WASMInterpFrame *frame)
     } while (0)
 #endif /* end of WASM_ENABLE_GC != 0 */
 
-#define read_uint32(p) \
-    (p += sizeof(uint32), LOAD_U32_WITH_2U16S(p - sizeof(uint32)))
-
 #define GET_LOCAL_INDEX_TYPE_AND_OFFSET()                                \
     do {                                                                 \
         uint32 param_count = cur_func->param_count;                      \
@@ -414,8 +298,6 @@ wasm_interp_get_frame_ref(WASMInterpFrame *frame)
         else                                                             \
             local_type = cur_func->local_types[local_idx - param_count]; \
     } while (0)
-
-#define GET_OFFSET() (frame_ip += 2, *(int16 *)(frame_ip - 2))
 
 #define SET_OPERAND_I32(off, value)                                 \
     do {                                                            \
@@ -454,75 +336,16 @@ wasm_interp_get_frame_ref(WASMInterpFrame *frame)
     (type) GET_I64_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
 #define GET_OPERAND_F64(type, off) \
     (type) GET_F64_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
+#define GET_OPERAND_V128(off) \
+    GET_V128_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
 #define GET_OPERAND_REF(type, off) \
     (type) GET_REF_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
 
 #define GET_OPERAND(type, op_type, off) GET_OPERAND_##op_type(type, off)
 
-#define PUSH_I32(value)                              \
-    do {                                             \
-        *(int32 *)(frame_lp + GET_OFFSET()) = value; \
-    } while (0)
-
-#define PUSH_F32(value)                                \
-    do {                                               \
-        *(float32 *)(frame_lp + GET_OFFSET()) = value; \
-    } while (0)
-
-#define PUSH_I64(value)                             \
-    do {                                            \
-        uint32 *addr_tmp = frame_lp + GET_OFFSET(); \
-        PUT_I64_TO_ADDR(addr_tmp, value);           \
-    } while (0)
-
-#define PUSH_F64(value)                             \
-    do {                                            \
-        uint32 *addr_tmp = frame_lp + GET_OFFSET(); \
-        PUT_F64_TO_ADDR(addr_tmp, value);           \
-    } while (0)
-
-#define PUSH_REF(value)                   \
-    do {                                  \
-        uint32 *addr_tmp;                 \
-        opnd_off = GET_OFFSET();          \
-        addr_tmp = frame_lp + opnd_off;   \
-        PUT_REF_TO_ADDR(addr_tmp, value); \
-        SET_FRAME_REF(opnd_off);          \
-    } while (0)
-
-#define PUSH_I31REF(value)                \
-    do {                                  \
-        uint32 *addr_tmp;                 \
-        opnd_off = GET_OFFSET();          \
-        addr_tmp = frame_lp + opnd_off;   \
-        PUT_REF_TO_ADDR(addr_tmp, value); \
-    } while (0)
-
-#define POP_I32() (*(int32 *)(frame_lp + GET_OFFSET()))
-
-#define POP_F32() (*(float32 *)(frame_lp + GET_OFFSET()))
-
-#define POP_I64() (GET_I64_FROM_ADDR(frame_lp + GET_OFFSET()))
-
-#define POP_F64() (GET_F64_FROM_ADDR(frame_lp + GET_OFFSET()))
-
 #define POP_REF()                                                    \
     (opnd_off = GET_OFFSET(), CLEAR_FRAME_REF((unsigned)(opnd_off)), \
      GET_REF_FROM_ADDR(frame_lp + opnd_off))
-
-#if WASM_ENABLE_GC != 0
-#define SYNC_FRAME_REF() frame->frame_ref = frame_ref
-#define UPDATE_FRAME_REF() frame_ref = frame->frame_ref
-#else
-#define SYNC_FRAME_REF() (void)0
-#define UPDATE_FRAME_REF() (void)0
-#endif
-
-#define SYNC_ALL_TO_FRAME()   \
-    do {                      \
-        frame->ip = frame_ip; \
-        SYNC_FRAME_REF();     \
-    } while (0)
 
 #define UPDATE_ALL_FROM_FRAME() \
     do {                        \
@@ -552,14 +375,6 @@ wasm_interp_get_frame_ref(WASMInterpFrame *frame)
         frame_lp = frame->lp;           \
         RECOVER_FRAME_REF();            \
     } while (0)
-
-#if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
-#define GET_OPCODE() opcode = *frame_ip++;
-#else
-#define GET_OPCODE()    \
-    opcode = *frame_ip; \
-    frame_ip += 2;
-#endif
 
 #define DEF_OP_EQZ(ctype, src_op_type)                                  \
     do {                                                                \
@@ -1401,12 +1216,6 @@ wasm_interp_dump_op_count()
 
 #if WASM_ENABLE_LABELS_AS_VALUES != 0
 
-/* #define HANDLE_OP(opcode) HANDLE_##opcode:printf(#opcode"\n"); */
-#if WASM_ENABLE_OPCODE_COUNTER != 0
-#define HANDLE_OP(opcode) HANDLE_##opcode : opcode_table[opcode].count++;
-#else
-#define HANDLE_OP(opcode) HANDLE_##opcode:
-#endif
 #if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
 #define FETCH_OPCODE_AND_DISPATCH()                    \
     do {                                               \
@@ -1691,6 +1500,11 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                         PUT_I64_TO_ADDR(prev_frame->lp + ret_offset,
                                         GET_OPERAND(uint64, I64, off));
                         ret_offset += 2;
+                    }
+                    else if (ret_types[ret_idx] == VALUE_TYPE_V128) {
+                        PUT_V128_TO_ADDR(prev_frame->lp + ret_offset,
+                                         GET_OPERAND_V128(off));
+                        ret_offset += 4;
                     }
 #if WASM_ENABLE_GC != 0
                     else if (wasm_is_type_reftype(ret_types[ret_idx])) {
@@ -3531,6 +3345,24 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                 HANDLE_OP_END();
             }
 
+#if WASM_ENABLE_SIMD != 0
+            HANDLE_OP(EXT_OP_SET_LOCAL_FAST_V128)
+            HANDLE_OP(EXT_OP_TEE_LOCAL_FAST_V128)
+            {
+                /* clang-format off */
+#if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
+                local_offset = *frame_ip++;
+#else
+                local_offset = *frame_ip;
+                frame_ip += 2;
+#endif
+                /* clang-format on */
+                PUT_V128_TO_ADDR((uint32 *)(frame_lp + local_offset),
+                                 GET_OPERAND_V128(0));
+                frame_ip += 2;
+                HANDLE_OP_END();
+            }
+#endif
             HANDLE_OP(WASM_OP_GET_GLOBAL)
             {
                 global_idx = read_uint32(frame_ip);
@@ -3567,7 +3399,19 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                                 GET_I64_FROM_ADDR((uint32 *)global_addr));
                 HANDLE_OP_END();
             }
-
+#if WASM_ENABLE_SIMD != 0
+            HANDLE_OP(WASM_OP_GET_GLOBAL_V128)
+            {
+                global_idx = read_uint32(frame_ip);
+                bh_assert(global_idx < module->e->global_count);
+                global = globals + global_idx;
+                global_addr = get_global_addr(global_data, global);
+                addr_ret = GET_OFFSET();
+                PUT_V128_TO_ADDR(frame_lp + addr_ret,
+                                 GET_V128_FROM_ADDR((uint32 *)global_addr));
+                HANDLE_OP_END();
+            }
+#endif
             HANDLE_OP(WASM_OP_SET_GLOBAL)
             {
                 global_idx = read_uint32(frame_ip);
@@ -3634,6 +3478,19 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                                 GET_I64_FROM_ADDR(frame_lp + addr1));
                 HANDLE_OP_END();
             }
+#if WASM_ENABLE_SIMDE != 0
+            HANDLE_OP(WASM_OP_SET_GLOBAL_V128)
+            {
+                global_idx = read_uint32(frame_ip);
+                bh_assert(global_idx < module->e->global_count);
+                global = globals + global_idx;
+                global_addr = get_global_addr(global_data, global);
+                addr1 = GET_OFFSET();
+                PUT_V128_TO_ADDR((uint32 *)global_addr,
+                                 GET_V128_FROM_ADDR(frame_lp + addr1));
+                HANDLE_OP_END();
+            }
+#endif
 
             /* memory load instructions */
             HANDLE_OP(WASM_OP_I32_LOAD)
@@ -4879,6 +4736,28 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
 
                 HANDLE_OP_END();
             }
+#if WASM_ENABLE_SIMD != 0
+            HANDLE_OP(EXT_OP_COPY_STACK_TOP_V128)
+            {
+                addr1 = GET_OFFSET();
+                addr2 = GET_OFFSET();
+
+                PUT_V128_TO_ADDR(frame_lp + addr2,
+                                 GET_V128_FROM_ADDR(frame_lp + addr1));
+
+#if WASM_ENABLE_GC != 0
+                /* Ignore constants because they are not reference */
+                if (addr1 >= 0) {
+                    if (*FRAME_REF(addr1)) {
+                        CLEAR_FRAME_REF(addr1);
+                        SET_FRAME_REF(addr2);
+                    }
+                }
+#endif
+
+                HANDLE_OP_END();
+            }
+#endif
 
             HANDLE_OP(EXT_OP_COPY_STACK_VALUES)
             {
@@ -5737,7 +5616,27 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
 #endif
                 goto call_func_from_entry;
             }
-
+            HANDLE_OP(WASM_OP_SIMD_PREFIX)
+            {
+#if WASM_ENABLE_SIMD != 0
+                GET_OPCODE();
+                frame_ip =
+                    wasm_simd_handle_op(module, frame_ip, frame_lp, maddr,
+                                        (uint32*)&addr_ret, opcode, linear_mem_size
+#if !defined(OS_ENABLE_HW_BOUND_CHECK) \
+    || WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS == 0
+                                        ,
+                                        disable_bounds_checks
+#endif
+                    );
+                if (!frame_ip)
+                    goto got_exception;
+#else
+        wasm_set_exception(module, "unsupported SIMD opcode");
+        goto got_exception;
+#endif
+                HANDLE_OP_END();
+            }
             HANDLE_OP(WASM_OP_CALL)
             {
 #if WASM_ENABLE_THREAD_MGR != 0
@@ -5845,7 +5744,7 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
 #if WASM_ENABLE_LABELS_AS_VALUES == 0
         continue;
 #else
-    FETCH_OPCODE_AND_DISPATCH();
+            FETCH_OPCODE_AND_DISPATCH();
 #endif
 
 #if WASM_ENABLE_TAIL_CALL != 0 || WASM_ENABLE_GC != 0
@@ -5914,8 +5813,14 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
         }
 
         for (i = 0; i < cur_func->param_count; i++) {
-            if (cur_func->param_types[i] == VALUE_TYPE_I64
-                || cur_func->param_types[i] == VALUE_TYPE_F64) {
+            if (cur_func->param_types[i] == VALUE_TYPE_V128) {
+                PUT_V128_TO_ADDR(
+                    outs_area->lp,
+                    GET_OPERAND_V128(2 * (cur_func->param_count - i - 1)));
+                outs_area->lp += 4;
+            }
+            else if (cur_func->param_types[i] == VALUE_TYPE_I64
+                     || cur_func->param_types[i] == VALUE_TYPE_F64) {
                 PUT_I64_TO_ADDR(
                     outs_area->lp,
                     GET_OPERAND(uint64, I64,
