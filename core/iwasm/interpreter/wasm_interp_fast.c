@@ -1053,6 +1053,11 @@ fail:
                         frame_lp + dst_offsets[0],                          \
                         GET_I64_FROM_ADDR(frame_lp + src_offsets[0]));      \
                 }                                                           \
+                else if (cells[0] == 4) {                                   \
+                    PUT_V128_TO_ADDR(                                       \
+                        frame_lp + dst_offsets[0],                          \
+                        GET_V128_FROM_ADDR(frame_lp + src_offsets[0]));     \
+                }                                                           \
             }                                                               \
             else {                                                          \
                 if (!copy_stack_values(module, frame_lp, arity, total_cell, \
